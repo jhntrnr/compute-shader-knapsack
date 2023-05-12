@@ -1,5 +1,7 @@
 A heuristic solution to a multidimensional multiple-choice knapsack problem using a compute shader to offload the work to the GPU.
 
+![thumb2](https://github.com/jhntrnr/compute-shader-knapsack/assets/90057903/aa09cc8d-bd6c-4d94-b67d-daf6261ce881)
+
 Problem definition:
 There are four 1024x1024 images initialized with a random RGB color set in each pixel. Pick exactly one pixel from each image such that the total *Red* value of selected pixels is maximized, the total *Green* value of selected pixels is above some threshold, and teh total *Blue* value of selected pixels is below another threshold.
 
@@ -11,3 +13,5 @@ The solution found by the compute shader is not an exact one; the shader is not 
 Demonstration: https://youtu.be/PMCOIaDS8vY
 
 Full Explanation: https://youtu.be/wf4sxYKgxqY
+
+Note that this project may not work properly on all hardware. See Unity's compute shader documentation for details: https://docs.unity3d.com/Manual/class-ComputeShader.html

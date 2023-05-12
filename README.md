@@ -7,3 +7,7 @@ Solution explanation:
 The solution in this project is defined as the center 4 pixels in the resulting render texture (the bottom-right pixel of the top-left quadrant, bottom-left pixel of the top-right quadrant, etc).
 
 The solution found by the compute shader is not an exact one; the shader is not guaranteed to find an optimal answer. It uses a heuristic function to score pixels along with sorting algorithms to try and find good solutions quickly. It optionally applies a "temperature" value to pixels as a form of simulated annealing to escape local minima and find better solutions.
+
+Demonstration: https://youtu.be/PMCOIaDS8vY
+
+Full Explanation: https://youtu.be/wf4sxYKgxqY

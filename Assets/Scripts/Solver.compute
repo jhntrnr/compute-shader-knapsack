@@ -1,0 +1,211 @@
+#pragma kernel ArrayInitializer
+#pragma kernel DrawResult
+#pragma kernel SortingStep
+#pragma kernel HeuristicStep
+
+RWTexture2D<float4>ArrayAIn;
+RWTexture2D<float4>ArrayAOut;
+
+RWTexture2D<float4>ArrayBIn;
+RWTexture2D<float4>ArrayBOut;
+
+RWTexture2D<float4>ArrayCIn;
+RWTexture2D<float4>ArrayCOut;
+
+RWTexture2D<float4>ArrayDIn;
+RWTexture2D<float4>ArrayDOut;
+
+RWTexture2D<float4> Result;
+
+uint width;
+uint height;
+float rngSeed;
+uint iterationFlipper;
+bool xyFlip;
+
+float yThreshold;
+float zThreshold;
+float temperatureMult;
+
+bool usingAlpha;
+
+float3 hash33(float3 p3)
+{
+    p3 = frac(p3 * float3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yxz + 33.33);
+    return frac((p3.xxy + p3.yxx) * p3.zyx);
+}
+
+bool Even(uint x) {
+    if (x % 2 == 0) {
+        return true;
+    }
+    return false;
+}
+
+bool Odd(uint x) {
+    if (x % 2 != 0) {
+        return true;
+    }
+    return false;
+}
+
+float4 maxA(float4 colorA, float4 colorB) {
+    if (colorB.a > colorA.a) {
+        return(colorB);
+    }
+    else {
+        if (colorB.a == colorA.a) {
+            if (colorB.r > colorA.r) {
+                return(colorB);
+            }
+        }
+    }
+    return(colorA);
+}
+
+float4 minA(float4 colorA, float4 colorB) {
+    if (colorB.a < colorA.a) {
+        return(colorB);
+    }
+    else {
+        if (colorB.a == colorA.a) {
+            if (colorB.r < colorA.r) {
+                return(colorB);
+            }
+        }
+    }
+    return(colorA);
+}
+
+[numthreads(8,8,1)]
+void HeuristicStep(uint3 id: SV_DispatchThreadID)
+{
+    float4 ArrayA = float4(ArrayAIn[id.xy].r, ArrayAIn[id.xy].g, ArrayAIn[id.xy].b, ArrayAIn[id.xy].a - (temperatureMult + (0.01 * rngSeed)));
+    float4 ArrayB = float4(ArrayBIn[id.xy].r, ArrayBIn[id.xy].g, ArrayBIn[id.xy].b, ArrayBIn[id.xy].a - (temperatureMult + (0.01 * rngSeed)));
+    float4 ArrayC = float4(ArrayCIn[id.xy].r, ArrayCIn[id.xy].g, ArrayCIn[id.xy].b, ArrayCIn[id.xy].a - (temperatureMult + (0.01 * rngSeed)));
+    float4 ArrayD = float4(ArrayDIn[id.xy].r, ArrayDIn[id.xy].g, ArrayDIn[id.xy].b, ArrayDIn[id.xy].a - (temperatureMult + (0.01 * rngSeed)));
+    float4 candidate = ArrayA + ArrayB + ArrayC + ArrayD;
+    float heuristicResult = (candidate.r + candidate.g - candidate.b + 3) / 32;
+
+
+    if (candidate.g < yThreshold) {
+        heuristicResult -= 0.1;
+    }
+    if (candidate.b > zThreshold) {
+        heuristicResult -= 0.1;
+    }
+    if (candidate.b > zThreshold && candidate.g < yThreshold) {
+        heuristicResult = 0;
+    }
+
+    ArrayAOut[id.xy] = float4(ArrayA.r, ArrayA.g, ArrayA.b, ArrayA.a + heuristicResult);
+    ArrayBOut[id.xy] = float4(ArrayB.r, ArrayB.g, ArrayB.b, ArrayB.a + heuristicResult);
+    ArrayCOut[id.xy] = float4(ArrayC.r, ArrayC.g, ArrayC.b, ArrayC.a + heuristicResult);
+    ArrayDOut[id.xy] = float4(ArrayD.r, ArrayD.g, ArrayD.b, ArrayD.a + heuristicResult);
+}
+
+[numthreads(8,8,1)]
+void SortingStep(uint3 id: SV_DispatchThreadID)
+{
+    if (xyFlip) {
+        if ((Even(id.x) && Even(iterationFlipper)) || (Odd(id.x) && Odd(iterationFlipper))) {
+            if (id.x > 0) {
+                ArrayAOut[id.xy] = maxA(ArrayAIn[id.xy], ArrayAIn[uint2(id.x - 1, id.y)]);
+                ArrayBOut[id.xy] = maxA(ArrayBIn[id.xy], ArrayBIn[uint2(id.x - 1, id.y)]);
+                ArrayCOut[id.xy] = maxA(ArrayCIn[id.xy], ArrayCIn[uint2(id.x - 1, id.y)]);
+                ArrayDOut[id.xy] = maxA(ArrayDIn[id.xy], ArrayDIn[uint2(id.x - 1, id.y)]);
+                return;
+            }
+        }
+        else {
+            if (id.x < width - 1) {
+                ArrayAOut[id.xy] = minA(ArrayAIn[id.xy], ArrayAIn[uint2(id.x + 1, id.y)]);
+                ArrayBOut[id.xy] = minA(ArrayBIn[id.xy], ArrayBIn[uint2(id.x + 1, id.y)]);
+                ArrayCOut[id.xy] = minA(ArrayCIn[id.xy], ArrayCIn[uint2(id.x + 1, id.y)]);
+                ArrayDOut[id.xy] = minA(ArrayDIn[id.xy], ArrayDIn[uint2(id.x + 1, id.y)]);
+                return;
+            }
+
+        }
+    }
+
+    else {
+        if ((Even(id.y) && Even(iterationFlipper)) || (Odd(id.y) && Odd(iterationFlipper))) {
+            if (id.y > 0) {
+                ArrayAOut[id.xy] = maxA(ArrayAIn[id.xy], ArrayAIn[uint2(id.x, id.y - 1)]);
+                ArrayBOut[id.xy] = maxA(ArrayBIn[id.xy], ArrayBIn[uint2(id.x, id.y - 1)]);
+                ArrayCOut[id.xy] = maxA(ArrayCIn[id.xy], ArrayCIn[uint2(id.x, id.y - 1)]);
+                ArrayDOut[id.xy] = maxA(ArrayDIn[id.xy], ArrayDIn[uint2(id.x, id.y - 1)]);
+                return;
+            }
+        }
+        else {
+            if (id.y < height - 1) {
+                ArrayAOut[id.xy] = minA(ArrayAIn[id.xy], ArrayAIn[uint2(id.x, id.y + 1)]);
+                ArrayBOut[id.xy] = minA(ArrayBIn[id.xy], ArrayBIn[uint2(id.x, id.y + 1)]);
+                ArrayCOut[id.xy] = minA(ArrayCIn[id.xy], ArrayCIn[uint2(id.x, id.y + 1)]);
+                ArrayDOut[id.xy] = minA(ArrayDIn[id.xy], ArrayDIn[uint2(id.x, id.y + 1)]);
+                return;
+            }
+        }
+    }
+    ArrayAOut[id.xy] = ArrayAIn[id.xy];
+    ArrayBOut[id.xy] = ArrayBIn[id.xy];
+    ArrayCOut[id.xy] = ArrayCIn[id.xy];
+    ArrayDOut[id.xy] = ArrayDIn[id.xy];
+}
+
+[numthreads(8,8,1)]
+void ArrayInitializer(uint3 id: SV_DispatchThreadID)
+{
+    float3 ArrA = hash33(float3(id.x, id.y, 0.1 + rngSeed));
+    ArrayAOut[id.xy] = float4(ArrA.x, ArrA.y, ArrA.z, 0);
+
+    float3 ArrB = hash33(float3(id.x, id.y, 0.2 + rngSeed));
+    ArrayBOut[id.xy] = float4(ArrB.x, ArrB.y, ArrB.z, 0);
+
+    float3 ArrC = hash33(float3(id.x, id.y, 0.3 + rngSeed));
+    ArrayCOut[id.xy] = float4(ArrC.x, ArrC.y, ArrC.z, 0);
+
+    float3 ArrD = hash33(float3(id.x, id.y, 0.4 + rngSeed));
+    ArrayDOut[id.xy] = float4(ArrD.x, ArrD.y, ArrD.z, 0);
+}
+
+[numthreads(8,8,1)]
+void DrawResult (uint3 id : SV_DispatchThreadID)
+{
+    float alphaA = 1;
+    float alphaB = 1;
+    float alphaC = 1;
+    float alphaD = 1;
+
+    if (id.x < width) {
+        if (id.y < height) {
+            if (usingAlpha) {
+                alphaA = ArrayAOut[id.xy].a;
+            }
+            Result[id.xy] = float4(ArrayAOut[id.xy].x, ArrayAOut[id.xy].y, ArrayAOut[id.xy].z, alphaA);
+        }
+        else {
+            if (usingAlpha) {
+                alphaB = ArrayBOut[uint2(id.x, height - (id.y - height + 1))].a;
+            }
+            Result[id.xy] = float4(ArrayBOut[uint2(id.x, height - (id.y - height + 1))].x, ArrayBOut[uint2(id.x, height - (id.y - height + 1))].y, ArrayBOut[uint2(id.x, height - (id.y - height + 1))].z, alphaB);
+        }
+    }
+    else {
+        if (id.y < height) {
+            if (usingAlpha) {
+                alphaC = ArrayCOut[uint2(width - (id.x - width + 1), id.y)].a;
+            }
+            Result[id.xy] = float4(ArrayCOut[uint2(width - (id.x - width + 1), id.y)].x, ArrayCOut[uint2(width - (id.x - width + 1), id.y)].y, ArrayCOut[uint2(width - (id.x - width + 1), id.y)].z, alphaC);
+        }
+        else {
+            if (usingAlpha) {
+                alphaD = ArrayDOut[uint2(width - (id.x - width + 1), height - (id.y - height + 1))].a;
+            }
+            Result[id.xy] = float4(ArrayDOut[uint2(width - (id.x - width + 1), height - (id.y - height + 1))].x, ArrayDOut[uint2(width - (id.x - width + 1), height - (id.y - height + 1))].y, ArrayDOut[uint2(width - (id.x - width + 1), height - (id.y - height + 1))].z, alphaD);
+        }
+    }
+}
